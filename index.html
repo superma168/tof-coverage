@@ -300,9 +300,13 @@ margin_length = (L_floor − L_usable) / 2 = h · tan(β / 2)</div>
     if(text!==undefined&&text!==null) n.textContent=text;
     return n;
   }
+  // No xmlns attribute here: createElementNS already places the element in the SVG
+  // namespace, and XMLSerializer adds the declaration on export. Setting it by hand
+  // makes the serialiser emit a second one, which is a fatal XML error in the
+  // downloaded file.
   function svgRoot(w,h){
-    return el("svg",{viewBox:"0 0 "+w+" "+h,width:"100%",xmlns:NS,
-      "font-family":"system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"});
+    return el("svg",{viewBox:"0 0 "+w+" "+h,width:"100%",
+      "font-family":'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif'});
   }
   function textW(txt,size,mono){ return txt.length*size*(mono?0.60:0.545); }
 
@@ -800,21 +804,49 @@ margin_length = (L_floor − L_usable) / 2 = h · tan(β / 2)</div>
   $("linkBtn").addEventListener("click",function(){ writeHash(); copy(location.href,"Link copied"); });
   $("printBtn").addEventListener("click",function(){ window.print(); });
 
+  // Export one diagram as a standalone SVG file that opens on its own: theme tokens
+  // resolved to literal colours, an intrinsic pixel size, and an opaque backdrop
+  // (the labels are drawn assuming the page background behind them).
+  function exportSvg(mountId, name){
+    var src=$(mountId).querySelector("svg");
+    if(!src){ toast("Nothing to export yet"); return; }
+    var cs=getComputedStyle(document.body);
+    var tok=function(v,fb){ return (cs.getPropertyValue(v)||"").trim()||fb; };
+
+    var vb=(src.getAttribute("viewBox")||"").split(/[\s,]+/);
+    var w=parseFloat(vb[2])||1000, h=parseFloat(vb[3])||620;
+
+    var svg=src.cloneNode(true);
+    svg.setAttribute("width",w);                 // real dimensions, not 100%
+    svg.setAttribute("height",h);
+    svg.setAttribute("viewBox","0 0 "+w+" "+h);
+
+    var bg=el("rect",{x:0,y:0,width:w,height:h,fill:tok("--panel","#ffffff")});
+    svg.insertBefore(bg, svg.firstChild);
+
+    var t=el("title",null,name);
+    svg.insertBefore(t, svg.firstChild);
+
+    var out=new XMLSerializer().serializeToString(svg);
+    ["--ink","--ink-2","--ink-3","--line","--line-strong","--beam","--ok","--bad","--sensor","--panel","--bg"]
+      .forEach(function(v){ out=out.split("var("+v+")").join(tok(v,"#000")); });
+    if(!/\sxmlns=/.test(out)) out=out.replace("<svg",'<svg xmlns="http://www.w3.org/2000/svg"');
+
+    var blob=new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n'+out+'\n'],{type:"image/svg+xml;charset=utf-8"});
+    var a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=name.replace(/[^a-z0-9]+/gi,"-").replace(/^-|-$/g,"").toLowerCase()+".svg";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); },4000);
+    toast("SVG downloaded");
+  }
+
   Array.prototype.forEach.call(document.querySelectorAll("[data-dl]"),function(btn){
     btn.addEventListener("click",function(){
-      var src=$(btn.getAttribute("data-dl")).querySelector("svg");
-      if(!src) return;
-      var cs=getComputedStyle(document.body);
-      var vars=["--ink","--ink-2","--ink-3","--line","--line-strong","--beam","--ok","--bad","--sensor","--panel"];
-      var html=new XMLSerializer().serializeToString(src.cloneNode(true));
-      vars.forEach(function(v){ html=html.split("var("+v+")").join(cs.getPropertyValue(v).trim()||"#000"); });
-      html=html.replace("<svg",'<svg xmlns="http://www.w3.org/2000/svg"');
-      var a=document.createElement("a");
-      a.href=URL.createObjectURL(new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n'+html],{type:"image/svg+xml"}));
-      a.download="tof-"+btn.getAttribute("data-dl").replace("svg","").toLowerCase()+"-coverage.svg";
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(function(){ URL.revokeObjectURL(a.href); },2000);
-      toast("SVG downloaded");
+      var id=btn.getAttribute("data-dl");
+      var s=readState();
+      var which={svgW:"tof-side-width", svgL:"tof-side-length", svgP:"tof-plan"}[id]||"tof-diagram";
+      exportSvg(id, which+" "+fmt(s.fovW,0)+"x"+fmt(s.fovL,0)+"deg H"+fmt(s.H,2)+" h"+fmt(s.h,2));
     });
   });
 
