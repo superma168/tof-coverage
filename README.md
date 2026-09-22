@@ -6,6 +6,8 @@ a given height* is actually detected.
 
 No build step, no dependencies. Open `index.html` in a browser, or serve it from GitHub Pages.
 
+Live Demo: https://superma168.github.io/tof-coverage/
+
 ## The problem
 
 A TOF lens has two field-of-view angles and casts a rectangular pyramid of IR down onto the floor,
@@ -112,8 +114,3 @@ width.
 * A shorter person is covered over a larger area, a taller person over a smaller one. Size for the
   tallest occupant that must be caught.
 * Lens distortion and any mounting recess are not modelled — enter the true lens height as `H`.
-
-## Publishing
-
-The page is fully self-contained, so GitHub Pages needs nothing more than being pointed at the
-default branch root: **Settings → Pages → Source: deploy from branch → `main` / `/ (root)`**.
