@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TOF Coverage Calculator</title>
+<meta name="description" content="Calculate ceiling-mounted Time-of-Flight sensor floor coverage and the usable coverage for a standing person of a target height.">
+<style>
+  :root{
+    --bg:#f4f6f9; --panel:#ffffff; --panel-2:#fbfcfe;
+    --ink:#101828; --ink-2:#475467; --ink-3:#8a94a6;
+    --line:#dfe4ec; --line-strong:#c3cbd9;
+    --beam:#e08c10; --ok:#0f9d76; --bad:#e04b5f; --sensor:#2f6df6;
+    --ok-soft:rgba(15,157,118,.16); --bad-soft:rgba(224,75,95,.12);
+    --radius:14px;
+    --shadow:0 1px 2px rgba(16,24,40,.05), 0 8px 24px -12px rgba(16,24,40,.18);
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0d1117; --panel:#151b24; --panel-2:#1b222c;
+      --ink:#e9edf4; --ink-2:#a5b0c0; --ink-3:#6f7c8f;
+      --line:#2a3340; --line-strong:#3a4553;
+      --beam:#f5b445; --ok:#2bc79b; --bad:#f2697c; --sensor:#5b8cff;
+      --ok-soft:rgba(43,199,155,.16); --bad-soft:rgba(242,105,124,.14);
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d1117; --panel:#151b24; --panel-2:#1b222c;
+    --ink:#e9edf4; --ink-2:#a5b0c0; --ink-3:#6f7c8f;
+    --line:#2a3340; --line-strong:#3a4553;
+    --beam:#f5b445; --ok:#2bc79b; --bad:#f2697c; --sensor:#5b8cff;
+    --ok-soft:rgba(43,199,155,.16); --bad-soft:rgba(242,105,124,.14);
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.6);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1300px;margin:0 auto;padding:28px 16px 64px}
+
+  header.top{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+  header.top .titles{flex:1 1 320px;min-width:0}
+  h1{font-size:23px;line-height:1.25;margin:0 0 4px;letter-spacing:-.01em}
+  .sub{color:var(--ink-2);font-size:14px;margin:0;max-width:74ch}
+  .theme-btn{flex:0 0 auto;background:var(--panel);border:1px solid var(--line);color:var(--ink-2);
+    border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer;font-family:inherit}
+  .theme-btn:hover{border-color:var(--line-strong);color:var(--ink)}
+
+  .layout{display:grid;grid-template-columns:minmax(300px,356px) minmax(0,1fr);gap:20px;align-items:start}
+  @media (max-width:1000px){ .layout{grid-template-columns:1fr} }
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .card + .card{margin-top:18px}
+  .card-hd{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .card-hd h2{font-size:14px;margin:0;font-weight:650;letter-spacing:.01em}
+  .card-hd .hint{font-size:12px;color:var(--ink-3);margin-left:auto}
+  .card-bd{padding:18px}
+
+  .field{margin-bottom:16px}
+  .field:last-child{margin-bottom:0}
+  label.lab{display:block;font-size:13px;font-weight:600;margin-bottom:2px}
+  .lab .sym{font-family:var(--mono);color:var(--sensor);font-weight:700;font-size:12.5px}
+  .desc{font-size:12px;color:var(--ink-3);margin:0 0 7px}
+  .inp-shell{position:relative;display:flex;align-items:center}
+  input[type="number"]{width:100%;font-family:var(--mono);font-size:15px;color:var(--ink);
+    background:var(--panel-2);border:1px solid var(--line-strong);border-radius:10px;padding:9px 44px 9px 12px}
+  input[type="number"]:focus{outline:none;border-color:var(--sensor);box-shadow:0 0 0 3px rgba(47,109,246,.18)}
+  .unit{position:absolute;right:11px;font-size:12px;color:var(--ink-3);pointer-events:none;font-family:var(--mono)}
+  input[type="range"]{width:100%;margin:8px 0 0;accent-color:var(--sensor)}
+  .bad-input input[type="number"]{border-color:var(--bad)}
+
+  .presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+  .chip{background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:5px 11px;
+    font-size:12px;color:var(--ink-2);cursor:pointer;font-family:inherit;white-space:nowrap}
+  .chip:hover{border-color:var(--sensor);color:var(--ink)}
+
+  .alert{margin:0 0 14px;padding:10px 12px;border-radius:10px;font-size:13px;
+    background:var(--bad-soft);border:1px solid var(--bad);color:var(--ink)}
+  .alert.hide{display:none}
+
+  .res-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .res{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:12px 13px;border-left:3px solid var(--line-strong)}
+  .res.full{border-left-color:var(--beam)}
+  .res.det{border-left-color:var(--ok)}
+  .res.blind{border-left-color:var(--bad)}
+  .res .k{font-size:11.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;font-weight:650;margin-bottom:5px}
+  .res .v{font-family:var(--mono);font-size:19px;font-weight:650;letter-spacing:-.02em;line-height:1.2}
+  .res .v small{font-size:12px;color:var(--ink-3);font-weight:500}
+  .res .x{font-size:12px;color:var(--ink-2);margin-top:4px;font-family:var(--mono)}
+  .res.span{grid-column:1/-1}
+
+  .kv{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
+  .kv th,.kv td{text-align:left;padding:7px 0;border-top:1px solid var(--line);vertical-align:top}
+  .kv th{font-weight:500;color:var(--ink-2)}
+  .kv td{font-family:var(--mono);text-align:right;white-space:nowrap}
+
+  .btn-row{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .btn{background:var(--panel-2);border:1px solid var(--line-strong);color:var(--ink);border-radius:10px;
+    padding:8px 13px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:550}
+  .btn:hover{border-color:var(--sensor)}
+  .btn.primary{background:var(--sensor);border-color:var(--sensor);color:#fff}
+  .btn.primary:hover{filter:brightness(1.06)}
+  .btn.sm{padding:5px 10px;font-size:12px}
+
+  .diagram svg{display:block;width:100%;height:auto;background:transparent}
+
+  details.notes{margin-top:18px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius)}
+  details.notes summary{padding:13px 18px;cursor:pointer;font-size:14px;font-weight:600;list-style:none}
+  details.notes summary::-webkit-details-marker{display:none}
+  details.notes summary::before{content:"▸ ";color:var(--ink-3)}
+  details.notes[open] summary::before{content:"▾ "}
+  .notes-bd{padding:0 18px 18px;font-size:13.5px;color:var(--ink-2);max-width:88ch}
+  .notes-bd h3{font-size:13px;color:var(--ink);margin:16px 0 6px}
+  .notes-bd ul{margin:6px 0;padding-left:20px}
+  .notes-bd li{margin:4px 0}
+  .eq{font-family:var(--mono);font-size:13px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:10px;padding:12px 14px;margin:8px 0;color:var(--ink);overflow-x:auto;white-space:pre}
+  footer{margin-top:26px;font-size:12px;color:var(--ink-3);text-align:center}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);opacity:0;pointer-events:none;
+    background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13px;
+    transition:opacity .18s, transform .18s;z-index:9}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+  @media print{
+    body{background:#fff}
+    .theme-btn,.btn-row,.presets,input[type=range],.card-hd .btn{display:none}
+    .card{box-shadow:none;break-inside:avoid}
+    .layout{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="titles">
+      <h1>Time-of-Flight Ceiling Coverage Calculator</h1>
+      <p class="sub">A ceiling-mounted TOF sensor casts a rectangular pyramid of IR onto the floor. A standing person is seen by the top of their head, not by their feet — so the coverage you can actually rely on is the cone cross-section at head height, which is much smaller than the floor rectangle.</p>
+    </div>
+    <button class="theme-btn" id="themeBtn" type="button">Theme</button>
+  </header>
+
+  <div class="layout">
+
+    <!-- ===================== LEFT: inputs + results ===================== -->
+    <div>
+      <div class="card">
+        <div class="card-hd"><h2>Inputs</h2><span class="hint">updates live</span></div>
+        <div class="card-bd">
+
+          <div class="presets" id="presets"></div>
+
+          <div class="field" id="f-fovW">
+            <label class="lab" for="fovW">Sensor FOV — width direction &nbsp;<span class="sym">α</span></label>
+            <p class="desc">Full lens field-of-view angle across the room width.</p>
+            <div class="inp-shell"><input type="number" id="fovW" min="1" max="179" step="0.1" value="60"><span class="unit">deg</span></div>
+            <input type="range" id="fovW_r" min="1" max="179" step="0.5" value="60">
+          </div>
+
+          <div class="field" id="f-fovL">
+            <label class="lab" for="fovL">Sensor FOV — length direction &nbsp;<span class="sym">β</span></label>
+            <p class="desc">Full lens field-of-view angle along the room length.</p>
+            <div class="inp-shell"><input type="number" id="fovL" min="1" max="179" step="0.1" value="45"><span class="unit">deg</span></div>
+            <input type="range" id="fovL_r" min="1" max="179" step="0.5" value="45">
+          </div>
+
+          <div class="field" id="f-H">
+            <label class="lab" for="H">Ceiling / sensor lens height &nbsp;<span class="sym">H</span></label>
+            <p class="desc">Height of the TOF lens above the finished floor.</p>
+            <div class="inp-shell"><input type="number" id="H" min="0.1" max="30" step="0.01" value="2.80"><span class="unit">m</span></div>
+            <input type="range" id="H_r" min="1.5" max="8" step="0.01" value="2.80">
+          </div>
+
+          <div class="field" id="f-h">
+            <label class="lab" for="h">Target human height &nbsp;<span class="sym">h</span></label>
+            <p class="desc">Standing height of the person that must still be detected at the edge.</p>
+            <div class="inp-shell"><input type="number" id="h" min="0" max="2.5" step="0.01" value="1.75"><span class="unit">m</span></div>
+            <input type="range" id="h_r" min="0.5" max="2.2" step="0.01" value="1.75">
+          </div>
+
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd"><h2>Results</h2></div>
+        <div class="card-bd">
+          <div class="alert hide" id="alert"></div>
+
+          <div class="res-grid">
+            <div class="res full"><div class="k">Floor coverage — width</div><div class="v" id="r-Wf">–</div><div class="x" id="r-Wf-x"></div></div>
+            <div class="res full"><div class="k">Floor coverage — length</div><div class="v" id="r-Lf">–</div><div class="x" id="r-Lf-x"></div></div>
+            <div class="res det"><div class="k">Usable width for h</div><div class="v" id="r-Wd">–</div><div class="x" id="r-Wd-x"></div></div>
+            <div class="res det"><div class="k">Usable length for h</div><div class="v" id="r-Ld">–</div><div class="x" id="r-Ld-x"></div></div>
+            <div class="res span blind"><div class="k">Blind margin — a person at the edge is missed</div><div class="v" id="r-blind">–</div><div class="x" id="r-blind-x"></div></div>
+          </div>
+
+          <table class="kv">
+            <tr><th>Full floor area</th><td id="r-Af">–</td></tr>
+            <tr><th>Usable detection area for h</th><td id="r-Ad">–</td></tr>
+            <tr><th>Usable / full area</th><td id="r-ratio">–</td></tr>
+            <tr><th>Head clearance under sensor (H − h)</th><td id="r-clear">–</td></tr>
+            <tr><th>Usable diagonal (corner to corner)</th><td id="r-diag">–</td></tr>
+            <tr><th>Slant range to floor corner</th><td id="r-slant">–</td></tr>
+          </table>
+
+          <div class="btn-row">
+            <button class="btn primary" id="copyBtn" type="button">Copy summary</button>
+            <button class="btn" id="linkBtn" type="button">Copy link</button>
+            <button class="btn" id="printBtn" type="button">Print</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== RIGHT: diagrams ===================== -->
+    <div>
+      <div class="card diagram">
+        <div class="card-hd"><h2>Side elevation — width direction (α)</h2>
+          <button class="btn sm" data-dl="svgW" type="button" style="margin-left:auto">Download SVG</button></div>
+        <div id="svgW"></div>
+      </div>
+
+      <div class="card diagram">
+        <div class="card-hd"><h2>Side elevation — length direction (β)</h2>
+          <button class="btn sm" data-dl="svgL" type="button" style="margin-left:auto">Download SVG</button></div>
+        <div id="svgL"></div>
+      </div>
+
+      <div class="card diagram">
+        <div class="card-hd"><h2>Plan view — floor footprint</h2>
+          <button class="btn sm" data-dl="svgP" type="button" style="margin-left:auto">Download SVG</button></div>
+        <div id="svgP"></div>
+      </div>
+
+      <details class="notes">
+        <summary>Geometry, formulas and assumptions</summary>
+        <div class="notes-bd">
+          <p>The lens is treated as a point source at height <b>H</b> aimed straight down (nadir), with a rectangular pyramid field of view of full angles <b>α</b> across the width and <b>β</b> along the length.</p>
+
+          <h3>Floor coverage (ground plane, z = 0)</h3>
+          <div class="eq">W_floor = 2 · H · tan(α / 2)
+L_floor = 2 · H · tan(β / 2)</div>
+
+          <h3>Usable coverage for a person of height h</h3>
+          <p>A standing person's highest point is the top of the head at z = h. The cone cross-section shrinks linearly with height, so the head stays inside the FOV only while its horizontal offset from the sensor axis is within the cross-section at z = h:</p>
+          <div class="eq">W_usable = 2 · (H − h) · tan(α / 2)
+L_usable = 2 · (H − h) · tan(β / 2)
+
+W_usable / W_floor = L_usable / L_floor = (H − h) / H</div>
+          <p>The person's feet sit directly below their head, so that same rectangle is the usable floor footprint. Area therefore scales with the square of the height ratio:</p>
+          <div class="eq">A_usable / A_floor = ((H − h) / H)²</div>
+
+          <h3>Blind margin</h3>
+          <div class="eq">margin_width  = (W_floor − W_usable) / 2 = h · tan(α / 2)
+margin_length = (L_floor − L_usable) / 2 = h · tan(β / 2)</div>
+          <p>The blind margin depends only on the person's height and the FOV — not on the ceiling height. Raising the sensor grows the floor rectangle but the lost ring around it keeps the same width.</p>
+
+          <h3>Assumptions and caveats</h3>
+          <ul>
+            <li>Sensor points straight down; tilt skews the footprint and is not modelled.</li>
+            <li>FOV is a rectangular pyramid, as quoted on most multi-zone TOF datasheets. A circular-cone lens would inscribe a smaller rectangle.</li>
+            <li>Detection is treated as geometric line of sight to the top of the head. Real detection also needs sufficient return signal, and the range needed at a corner is the slant distance, which is longer than H.</li>
+            <li>Zone resolution is ignored: with a coarse zone grid the outermost zone may straddle the boundary, so keep design margin.</li>
+            <li>A shorter person is covered over a larger area, a taller person over a smaller one. Size for the tallest occupant you must catch.</li>
+            <li>Lens distortion and any mounting recess are not modelled — enter the true lens height as H.</li>
+          </ul>
+        </div>
+      </details>
+
+      <footer>All dimensions in metres. Each panel is drawn to scale.</footer>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var $ = function(id){ return document.getElementById(id); };
+  var RAD = Math.PI/180;
+  var NS  = "http://www.w3.org/2000/svg";
+
+  function fmt(v,d){ d=(d===undefined?2:d); return (Math.round(v*Math.pow(10,d))/Math.pow(10,d)).toFixed(d); }
+  function m(v){ return fmt(v,2)+" m"; }
+  function toast(msg){
+    var t=$("toast"); t.textContent=msg; t.classList.add("on");
+    clearTimeout(toast._t); toast._t=setTimeout(function(){ t.classList.remove("on"); },1700);
+  }
+
+  /* ------------------------------------------------------------ svg utils */
+  function el(name, attrs, text){
+    var n=document.createElementNS(NS,name);
+    if(attrs) for(var k in attrs) if(attrs[k]!==null&&attrs[k]!==undefined) n.setAttribute(k,attrs[k]);
+    if(text!==undefined&&text!==null) n.textContent=text;
+    return n;
+  }
+  function svgRoot(w,h){
+    return el("svg",{viewBox:"0 0 "+w+" "+h,width:"100%",xmlns:NS,
+      "font-family":"system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"});
+  }
+  function textW(txt,size,mono){ return txt.length*size*(mono?0.60:0.545); }
+
+  function label(parent,x,y,txt,opt){
+    opt=opt||{};
+    var size=opt.size||17, anchor=opt.anchor||"middle";
+    if(opt.plate!==false){
+      var w=textW(txt,size,opt.mono), pX=opt.padX||5, pY=opt.padY||3;
+      var x0 = anchor==="middle" ? x-w/2 : (anchor==="end" ? x-w : x);
+      parent.appendChild(el("rect",{x:x0-pX,y:y-size*0.82-pY,width:w+pX*2,height:size*1.06+pY*2,
+        rx:4,fill:"var(--panel)",opacity:opt.plateOpacity||0.9}));
+    }
+    parent.appendChild(el("text",{x:x,y:y,"font-size":size,"text-anchor":anchor,
+      fill:opt.fill||"var(--ink)","font-weight":opt.weight||600,
+      "font-family":opt.mono?"ui-monospace, SFMono-Regular, Menlo, Consolas, monospace":null},txt));
+  }
+  function line(parent,x1,y1,x2,y2,opt){
+    opt=opt||{};
+    parent.appendChild(el("line",{x1:x1,y1:y1,x2:x2,y2:y2,stroke:opt.stroke||"var(--line-strong)",
+      "stroke-width":opt.w||1.4,"stroke-dasharray":opt.dash||null,"stroke-linecap":"round",opacity:opt.opacity||null}));
+  }
+  function arrowHead(parent,x,y,dir,color){
+    var s=7,p;
+    if(dir==="r") p=x+","+y+" "+(x-s)+","+(y-s*0.55)+" "+(x-s)+","+(y+s*0.55);
+    else if(dir==="l") p=x+","+y+" "+(x+s)+","+(y-s*0.55)+" "+(x+s)+","+(y+s*0.55);
+    else if(dir==="d") p=x+","+y+" "+(x-s*0.55)+","+(y-s)+" "+(x+s*0.55)+","+(y-s);
+    else p=x+","+y+" "+(x-s*0.55)+","+(y+s)+" "+(x+s*0.55)+","+(y+s);
+    parent.appendChild(el("polygon",{points:p,fill:color}));
+  }
+  function dimH(parent,x1,x2,y,txt,color,opt){
+    opt=opt||{}; color=color||"var(--ink-2)";
+    line(parent,x1,y,x2,y,{stroke:color,w:1.3});
+    arrowHead(parent,x1,y,"l",color); arrowHead(parent,x2,y,"r",color);
+    var t=opt.tick||6;
+    line(parent,x1,y-t,x1,y+t,{stroke:color,w:1.3});
+    line(parent,x2,y-t,x2,y+t,{stroke:color,w:1.3});
+    label(parent,(x1+x2)/2,y-8,txt,{size:opt.size||17,fill:color,mono:true,weight:650});
+  }
+  function dimV(parent,x,y1,y2,txt,color,opt){
+    opt=opt||{}; color=color||"var(--ink-2)";
+    line(parent,x,y1,x,y2,{stroke:color,w:1.3});
+    arrowHead(parent,x,y1,"u",color); arrowHead(parent,x,y2,"d",color);
+    var t=opt.tick||6;
+    line(parent,x-t,y1,x+t,y1,{stroke:color,w:1.3});
+    line(parent,x-t,y2,x+t,y2,{stroke:color,w:1.3});
+    var mid=(y1+y2)/2, g=el("g",{transform:"rotate(-90 "+x+" "+mid+")"});
+    parent.appendChild(g);
+    label(g,x,mid-8,txt,{size:opt.size||17,fill:color,mono:true,weight:650});
+  }
+  function badge(parent,x,y,ok){
+    var c = ok ? "var(--ok)" : "var(--bad)";
+    parent.appendChild(el("circle",{cx:x,cy:y,r:10,fill:c}));
+    parent.appendChild(el("text",{x:x,y:y+5,"font-size":14,"text-anchor":"middle",fill:"var(--panel)",
+      "font-weight":700}, ok?"✓":"✕"));
+  }
+  // one-line legend, laid out left to right
+  function legendRow(parent,x,y,items){
+    var size=14, cur=x;
+    items.forEach(function(it){
+      if(it.kind==="badge"){ badge(parent,cur+9,y-4,it.ok); cur+=24; }
+      else {
+        parent.appendChild(el("rect",{x:cur,y:y-13,width:14,height:14,rx:3,
+          fill:it.fill,stroke:it.stroke||it.fill,"stroke-width":1.2,"fill-opacity":it.op===undefined?1:it.op}));
+        cur+=20;
+      }
+      parent.appendChild(el("text",{x:cur,y:y,"font-size":size,fill:"var(--ink-2)","font-weight":550},it.text));
+      cur += textW(it.text,size,false) + 22;
+    });
+  }
+
+  /* -------------------------------------------------------- human figures */
+  // topmost point lands exactly at floorY - hPx
+  function humanSide(parent,feetX,floorY,hPx,color,opacity){
+    var g=el("g",{fill:color,opacity:opacity===undefined?1:opacity});
+    var r=hPx*0.082, hc=floorY-hPx+r;
+    var torsoTop=hc+r*1.05, torsoBot=floorY-hPx*0.45, bw=hPx*0.088, lw=hPx*0.045;
+    g.appendChild(el("circle",{cx:feetX,cy:hc,r:r}));
+    g.appendChild(el("path",{d:"M"+(feetX-bw)+" "+(torsoTop+bw*0.5)
+      +" Q"+feetX+" "+(torsoTop-bw*0.45)+" "+(feetX+bw)+" "+(torsoTop+bw*0.5)
+      +" L"+(feetX+bw*0.78)+" "+torsoBot+" L"+(feetX-bw*0.78)+" "+torsoBot+" Z"}));
+    g.appendChild(el("rect",{x:feetX-bw*0.72,y:torsoBot-lw*0.4,width:lw,height:floorY-torsoBot+lw*0.4,rx:lw*0.45}));
+    g.appendChild(el("rect",{x:feetX+bw*0.72-lw,y:torsoBot-lw*0.4,width:lw,height:floorY-torsoBot+lw*0.4,rx:lw*0.45}));
+    g.appendChild(el("rect",{x:feetX-bw-lw*0.85,y:torsoTop+bw*0.55,width:lw*0.8,height:(torsoBot-torsoTop)*0.82,rx:lw*0.4}));
+    g.appendChild(el("rect",{x:feetX+bw+lw*0.05,y:torsoTop+bw*0.55,width:lw*0.8,height:(torsoBot-torsoTop)*0.82,rx:lw*0.4}));
+    parent.appendChild(g);
+  }
+  function humanPlan(parent,cx,cy,scale,color,opacity){
+    var g=el("g",{fill:color,opacity:opacity===undefined?1:opacity});
+    g.appendChild(el("circle",{cx:cx,cy:cy,r:0.21*scale,"fill-opacity":0.30}));  // shoulders
+    g.appendChild(el("circle",{cx:cx,cy:cy,r:0.105*scale}));                     // head
+    parent.appendChild(g);
+    return 0.21*scale;
+  }
+
+  /* ------------------------------------------------------------ the maths */
+  function compute(s){
+    var tw=Math.tan(s.fovW/2*RAD), tl=Math.tan(s.fovL/2*RAD), clear=s.H-s.h;
+    var o={tw:tw,tl:tl,clear:clear,
+      Wf:2*s.H*tw, Lf:2*s.H*tl,
+      Wd:2*Math.max(clear,0)*tw, Ld:2*Math.max(clear,0)*tl,
+      marginW:s.h*tw, marginL:s.h*tl};
+    o.Af=o.Wf*o.Lf; o.Ad=o.Wd*o.Ld;
+    o.ratio=o.Af>0?o.Ad/o.Af:0;
+    o.diag=Math.sqrt(o.Wd*o.Wd+o.Ld*o.Ld);
+    o.slant=Math.sqrt(s.H*s.H+(o.Wf/2)*(o.Wf/2)+(o.Lf/2)*(o.Lf/2));
+    return o;
+  }
+
+  /* ------------------------------------------------- side elevation panel */
+  function renderSide(mountId,s,o,axis){
+    var isW=(axis==="W");
+    var fov = isW?s.fovW:s.fovL;
+    var full= isW?o.Wf:o.Lf;
+    var use = isW?o.Wd:o.Ld;
+    var marg= isW?o.marginW:o.marginL;
+    var symA= isW?"α":"β";
+    var symF= isW?"W_floor":"L_floor";
+    var symU= isW?"W_usable":"L_usable";
+
+    var VW=1000, VH=620, padL=118, padR=64, padT=66, padB=176;
+    var innerW=VW-padL-padR, innerH=VH-padT-padB;
+    var scale=Math.min(innerW/Math.max(full*1.14,0.8), innerH/Math.max(s.H*1.10,0.8));
+
+    var cx=padL+innerW/2, floorY=padT+innerH;
+    var ceilY=floorY-s.H*scale, headY=floorY-s.h*scale;
+    var X=function(v){ return cx+v*scale; };
+    var hasUse = o.clear>0 && use>0;
+
+    var svg=svgRoot(VW,VH);
+    var defs=el("defs");
+    var gr=el("linearGradient",{id:"beam"+axis,x1:"0",y1:"0",x2:"0",y2:"1"});
+    gr.appendChild(el("stop",{offset:"0","stop-color":"var(--beam)","stop-opacity":"0.34"}));
+    gr.appendChild(el("stop",{offset:"1","stop-color":"var(--beam)","stop-opacity":"0.09"}));
+    defs.appendChild(gr);
+    var pat=el("pattern",{id:"hatch"+axis,width:"9",height:"9",patternTransform:"rotate(45)",patternUnits:"userSpaceOnUse"});
+    pat.appendChild(el("rect",{width:"9",height:"9",fill:"var(--bad)",opacity:"0.10"}));
+    pat.appendChild(el("line",{x1:"0",y1:"0",x2:"0",y2:"9",stroke:"var(--bad)","stroke-width":"2",opacity:"0.45"}));
+    defs.appendChild(pat);
+    svg.appendChild(defs);
+
+    /* ---- scene ---- */
+    svg.appendChild(el("rect",{x:padL-52,y:ceilY-26,width:innerW+104,height:26,fill:"var(--line)",opacity:"0.55"}));
+    line(svg,padL-52,ceilY,padL+innerW+52,ceilY,{stroke:"var(--line-strong)",w:2.2});
+
+    svg.appendChild(el("polygon",{points:X(0)+","+ceilY+" "+X(-full/2)+","+floorY+" "+X(full/2)+","+floorY,
+      fill:"url(#beam"+axis+")",stroke:"var(--beam)","stroke-width":1.6,"stroke-opacity":0.85}));
+
+    // floor bands: hatch only the blind margins, green for the usable band
+    if(hasUse){
+      svg.appendChild(el("rect",{x:X(-full/2),y:floorY,width:Math.max((full-use)/2*scale,0),height:16,fill:"url(#hatch"+axis+")"}));
+      svg.appendChild(el("rect",{x:X(use/2),y:floorY,width:Math.max((full-use)/2*scale,0),height:16,fill:"url(#hatch"+axis+")"}));
+      svg.appendChild(el("rect",{x:X(-use/2),y:floorY,width:use*scale,height:16,fill:"var(--ok)",opacity:0.42}));
+    } else {
+      svg.appendChild(el("rect",{x:X(-full/2),y:floorY,width:full*scale,height:16,fill:"url(#hatch"+axis+")"}));
+    }
+    line(svg,padL-52,floorY,padL+innerW+52,floorY,{stroke:"var(--line-strong)",w:2.4});
+    svg.appendChild(el("rect",{x:padL-52,y:floorY+16,width:innerW+104,height:7,fill:"var(--line)",opacity:"0.5"}));
+
+    // head-height detection plane + drop lines to the floor
+    if(hasUse){
+      line(svg,X(-use/2)-30,headY,X(use/2)+30,headY,{stroke:"var(--ok)",w:1.8,dash:"7 5"});
+      line(svg,X(-use/2),headY,X(-use/2),floorY,{stroke:"var(--ok)",w:1.3,dash:"3 4",opacity:0.9});
+      line(svg,X(use/2),headY,X(use/2),floorY,{stroke:"var(--ok)",w:1.3,dash:"3 4",opacity:0.9});
+    }
+
+    // sensor
+    svg.appendChild(el("rect",{x:X(0)-27,y:ceilY-3,width:54,height:19,rx:4,fill:"var(--sensor)"}));
+    svg.appendChild(el("rect",{x:X(0)-9,y:ceilY+14,width:18,height:7,rx:2.5,fill:"var(--sensor)",opacity:0.75}));
+    svg.appendChild(el("circle",{cx:X(0),cy:ceilY+17,r:3.4,fill:"var(--panel)"}));
+    line(svg,X(0),ceilY,X(0),floorY+16,{stroke:"var(--sensor)",w:1.1,dash:"9 4 2 4",opacity:0.5});
+
+    /* ---- people (under the annotation layer) ---- */
+    var hPx=s.h*scale, usePx=use*scale, margPx=marg*scale;
+    var drawLeft = hasUse && usePx>=0.42*hPx;
+    var pinkX=null;
+    if(hasUse && s.h>0){
+      humanSide(svg,X(use/2),floorY,hPx,"var(--ok)",1);
+      if(drawLeft) humanSide(svg,X(-use/2),floorY,hPx,"var(--ok)",1);
+      if(margPx>0.34*hPx){
+        pinkX=X(full/2-marg*0.38);
+        humanSide(svg,pinkX,floorY,hPx,"var(--bad)",0.55);
+      }
+    }
+
+    /* ---- annotation layer (always on top) ---- */
+    label(svg,padL+innerW+50,ceilY-34,"CEILING",{anchor:"end",size:14,fill:"var(--ink-3)",weight:700,plate:false});
+    label(svg,padL-48,floorY+42,"FLOOR",{anchor:"start",size:14,fill:"var(--ink-3)",weight:700,plate:false});
+    label(svg,X(0),ceilY-12,"TOF sensor",{size:14,fill:"var(--sensor)",weight:700,plateOpacity:0.92});
+
+    // FOV angle arc — kept clear of the head plane and the cone edges
+    var half=fov/2*RAD;
+    var r=Math.min(s.H*scale*0.40, 112, Math.max(o.clear,0)*scale*0.46, (full/2)*scale*0.92);
+    if(r>24){
+      var ax1=X(0)-r*Math.sin(half), ay=ceilY+r*Math.cos(half), ax2=X(0)+r*Math.sin(half);
+      svg.appendChild(el("path",{d:"M"+ax1+" "+ay+" A "+r+" "+r+" 0 0 0 "+ax2+" "+ay,
+        fill:"none",stroke:"var(--beam)","stroke-width":1.7}));
+      label(svg,X(0),ceilY+r+24,symA+" = "+fmt(fov,1)+"°",{size:18,fill:"var(--beam)",mono:true,weight:700});
+    }
+
+    // vertical dimensions, stacked at the far left clear of the cone
+    dimV(svg,padL-76,ceilY,floorY,"H = "+m(s.H),"var(--sensor)");
+    if(s.h>0){
+      line(svg,padL-30,headY,hasUse?X(-use/2)-34:X(0),headY,{stroke:"var(--ok)",w:1,dash:"3 4",opacity:0.55});
+      dimV(svg,padL-30,headY,floorY,"h = "+m(s.h),"var(--ok)");
+    }
+
+    // head-plane tag
+    if(hasUse) label(svg,X(-use/2)-36,headY-12,"z = h",{anchor:"end",size:14,fill:"var(--ok)",mono:true,weight:650});
+
+    // ✓ / ✕ badges — flipped below the head plane when the ceiling clearance is tight
+    if(hasUse && s.h>0){
+      var badgeY = (headY-ceilY > 52) ? headY-16 : headY+22;
+      svg.appendChild(el("circle",{cx:X(use/2),cy:headY,r:4.6,fill:"var(--panel)",stroke:"var(--ok)","stroke-width":2.4}));
+      badge(svg,X(use/2)-20,badgeY,true);
+      if(pinkX!==null) badge(svg,pinkX+20,badgeY,false);
+    }
+
+    // horizontal dimensions below the floor
+    var dy1=floorY+58, dy2=floorY+96;
+    if(hasUse){
+      line(svg,X(-use/2),floorY+23,X(-use/2),dy1,{stroke:"var(--ok)",w:1,dash:"2 3",opacity:0.7});
+      line(svg,X(use/2),floorY+23,X(use/2),dy1,{stroke:"var(--ok)",w:1,dash:"2 3",opacity:0.7});
+      dimH(svg,X(-use/2),X(use/2),dy1,symU+" = "+m(use),"var(--ok)");
+      if(margPx>26){
+        dimH(svg,X(use/2),X(full/2),floorY+32,fmt(marg,2),"var(--bad)",{size:15,tick:4});
+        dimH(svg,X(-full/2),X(-use/2),floorY+32,fmt(marg,2),"var(--bad)",{size:15,tick:4});
+      }
+    }
+    line(svg,X(-full/2),floorY+23,X(-full/2),dy2,{stroke:"var(--beam)",w:1,dash:"2 3",opacity:0.7});
+    line(svg,X(full/2),floorY+23,X(full/2),dy2,{stroke:"var(--beam)",w:1,dash:"2 3",opacity:0.7});
+    dimH(svg,X(-full/2),X(full/2),dy2,symF+" = "+m(full),"var(--beam)");
+
+    if(!hasUse)
+      label(svg,cx,headY-30,"h ≥ H — no usable coverage",{size:17,fill:"var(--bad)",weight:700});
+
+    legendRow(svg,padL-52,VH-22,[
+      {fill:"var(--beam)",op:0.28,stroke:"var(--beam)",text:"IR cone"},
+      {fill:"var(--ok)",op:0.42,stroke:"var(--ok)",text:"usable floor band for height h"},
+      {fill:"url(#hatch"+axis+")",stroke:"var(--bad)",text:"blind margin"},
+      {kind:"badge",ok:true,text:"head inside FOV"},
+      {kind:"badge",ok:false,text:"head outside FOV"}
+    ]);
+
+    var host=$(mountId); host.textContent=""; host.appendChild(svg);
+  }
+
+  /* ------------------------------------------------------- plan view panel */
+  function renderPlan(mountId,s,o){
+    var VW=1000, VH=760, padL=104, padR=104, padT=84, padB=176;
+    var innerW=VW-padL-padR, innerH=VH-padT-padB;
+    var scale=Math.min(innerW/Math.max(o.Wf*1.08,0.8), innerH/Math.max(o.Lf*1.08,0.8));
+    var cx=padL+innerW/2, cy=padT+innerH/2;
+    var X=function(v){ return cx+v*scale; }, Y=function(v){ return cy+v*scale; };
+    var hasUse=o.clear>0 && o.Wd>0 && o.Ld>0;
+
+    var svg=svgRoot(VW,VH);
+    var defs=el("defs");
+    var clip=el("clipPath",{id:"planClip"});
+    clip.appendChild(el("rect",{x:X(-o.Wf/2),y:Y(-o.Lf/2),width:o.Wf*scale,height:o.Lf*scale}));
+    defs.appendChild(clip);
+    svg.appendChild(defs);
+
+    // full floor coverage
+    svg.appendChild(el("rect",{x:X(-o.Wf/2),y:Y(-o.Lf/2),width:o.Wf*scale,height:o.Lf*scale,
+      fill:"var(--beam)","fill-opacity":0.13,stroke:"var(--beam)","stroke-width":1.9,"stroke-dasharray":"8 5"}));
+
+    // 1 m grid clipped to the coverage
+    var g=el("g",{"clip-path":"url(#planClip)",opacity:0.45});
+    for(var gx=-Math.ceil(o.Wf/2);gx<=Math.ceil(o.Wf/2);gx++)
+      if(gx!==0) g.appendChild(el("line",{x1:X(gx),y1:Y(-o.Lf/2),x2:X(gx),y2:Y(o.Lf/2),stroke:"var(--line-strong)","stroke-width":0.8}));
+    for(var gy=-Math.ceil(o.Lf/2);gy<=Math.ceil(o.Lf/2);gy++)
+      if(gy!==0) g.appendChild(el("line",{x1:X(-o.Wf/2),y1:Y(gy),x2:X(o.Wf/2),y2:Y(gy),stroke:"var(--line-strong)","stroke-width":0.8}));
+    svg.appendChild(g);
+
+    // usable coverage
+    if(hasUse)
+      svg.appendChild(el("rect",{x:X(-o.Wd/2),y:Y(-o.Ld/2),width:o.Wd*scale,height:o.Ld*scale,
+        fill:"var(--ok)","fill-opacity":0.20,stroke:"var(--ok)","stroke-width":2.2}));
+
+    // sensor axes
+    line(svg,X(-o.Wf/2)-18,cy,X(o.Wf/2)+18,cy,{stroke:"var(--sensor)",w:1,dash:"9 4 2 4",opacity:0.5});
+    line(svg,cx,Y(-o.Lf/2)-18,cx,Y(o.Lf/2)+18,{stroke:"var(--sensor)",w:1,dash:"9 4 2 4",opacity:0.5});
+
+    // people: one just inside each usable edge, one just outside
+    if(hasUse && s.h>0){
+      humanPlan(svg,X(o.Wd/2),cy,scale,"var(--ok)",1);
+      humanPlan(svg,cx,Y(o.Ld/2),scale,"var(--ok)",1);
+      if(o.marginW*scale>44) humanPlan(svg,X(o.Wd/2+o.marginW*0.5),cy,scale,"var(--bad)",0.6);
+      if(o.marginL*scale>44) humanPlan(svg,cx,Y(o.Ld/2+o.marginL*0.5),scale,"var(--bad)",0.6);
+    }
+
+    // sensor body
+    svg.appendChild(el("rect",{x:cx-17,y:cy-17,width:34,height:34,rx:7,fill:"var(--sensor)"}));
+    svg.appendChild(el("circle",{cx:cx,cy:cy,r:6.5,fill:"var(--panel)"}));
+
+    /* ---- annotation layer ---- */
+    if(hasUse && s.h>0){
+      badge(svg,X(o.Wd/2),cy-0.21*scale-16,true);
+      badge(svg,cx+0.21*scale+16,Y(o.Ld/2),true);
+      if(o.marginW*scale>44) badge(svg,X(o.Wd/2+o.marginW*0.5),cy-0.21*scale-16,false);
+      if(o.marginL*scale>44) badge(svg,cx+0.21*scale+16,Y(o.Ld/2+o.marginL*0.5),false);
+    }
+    label(svg,cx,cy+40,"TOF @ H = "+m(s.H),{size:16,fill:"var(--sensor)",weight:700,mono:true,plateOpacity:0.92});
+
+    // dimensions
+    dimH(svg,X(-o.Wf/2),X(o.Wf/2),Y(o.Lf/2)+66,"W_floor = "+m(o.Wf),"var(--beam)");
+    dimV(svg,X(o.Wf/2)+62,Y(-o.Lf/2),Y(o.Lf/2),"L_floor = "+m(o.Lf),"var(--beam)");
+    if(hasUse){
+      line(svg,X(-o.Wd/2),Y(-o.Ld/2),X(-o.Wd/2),Y(-o.Lf/2)-34,{stroke:"var(--ok)",w:1,dash:"2 3",opacity:0.6});
+      line(svg,X(o.Wd/2),Y(-o.Ld/2),X(o.Wd/2),Y(-o.Lf/2)-34,{stroke:"var(--ok)",w:1,dash:"2 3",opacity:0.6});
+      dimH(svg,X(-o.Wd/2),X(o.Wd/2),Y(-o.Lf/2)-34,"W_usable = "+m(o.Wd),"var(--ok)");
+      line(svg,X(-o.Wd/2),Y(-o.Ld/2),X(-o.Wf/2)-58,Y(-o.Ld/2),{stroke:"var(--ok)",w:1,dash:"2 3",opacity:0.6});
+      line(svg,X(-o.Wd/2),Y(o.Ld/2),X(-o.Wf/2)-58,Y(o.Ld/2),{stroke:"var(--ok)",w:1,dash:"2 3",opacity:0.6});
+      dimV(svg,X(-o.Wf/2)-58,Y(-o.Ld/2),Y(o.Ld/2),"L_usable = "+m(o.Ld),"var(--ok)");
+    } else {
+      label(svg,cx,cy-40,"h ≥ H — no usable coverage",{size:17,fill:"var(--bad)",weight:700});
+    }
+
+    // area call-outs, stacked in the bottom-left of the outer rectangle
+    label(svg,X(-o.Wf/2)+10,Y(o.Lf/2)-34,"full  "+fmt(o.Af,2)+" m²",
+      {anchor:"start",size:15,fill:"var(--beam)",mono:true,weight:700,plateOpacity:0.88});
+    if(hasUse)
+      label(svg,X(-o.Wf/2)+10,Y(o.Lf/2)-12,"usable "+fmt(o.Ad,2)+" m² ("+fmt(o.ratio*100,1)+"%)",
+        {anchor:"start",size:15,fill:"var(--ok)",mono:true,weight:700,plateOpacity:0.88});
+    if(hasUse && o.marginW*scale>40)
+      label(svg,X(o.Wf/2)-10,Y(-o.Lf/2)+24,"blind margin  "+fmt(o.marginW,2)+" × "+fmt(o.marginL,2)+" m",
+        {anchor:"end",size:15,fill:"var(--bad)",mono:true,weight:700,plateOpacity:0.88});
+
+    legendRow(svg,padL-52,VH-22,[
+      {fill:"var(--beam)",op:0.13,stroke:"var(--beam)",text:"full floor coverage"},
+      {fill:"var(--ok)",op:0.20,stroke:"var(--ok)",text:"usable coverage for height h"},
+      {kind:"badge",ok:true,text:"person detected"},
+      {kind:"badge",ok:false,text:"person missed"},
+      {fill:"none",stroke:"var(--line-strong)",text:"1 m grid"}
+    ]);
+
+    var host=$(mountId); host.textContent=""; host.appendChild(svg);
+  }
+
+  /* ------------------------------------------------------------- plumbing */
+  var FIELDS=["fovW","fovL","H","h"];
+  var LIMITS={fovW:[1,179],fovL:[1,179],H:[0.1,30],h:[0,2.5]};
+
+  function readState(){
+    var s={};
+    FIELDS.forEach(function(k){ var v=parseFloat($(k).value); s[k]=isFinite(v)?v:0; });
+    return s;
+  }
+  function clampInto(k){
+    var v=parseFloat($(k).value); if(!isFinite(v)) return;
+    var L=LIMITS[k];
+    if(v<L[0]) $(k).value=L[0];
+    if(v>L[1]) $(k).value=L[1];
+  }
+  function validate(s){
+    var errs=[];
+    FIELDS.forEach(function(k){ $("f-"+k).classList.remove("bad-input"); });
+    if(!(s.fovW>0&&s.fovW<180)){ errs.push("FOV α must be between 0° and 180°."); $("f-fovW").classList.add("bad-input"); }
+    if(!(s.fovL>0&&s.fovL<180)){ errs.push("FOV β must be between 0° and 180°."); $("f-fovL").classList.add("bad-input"); }
+    if(!(s.H>0)){ errs.push("Ceiling height must be greater than 0."); $("f-H").classList.add("bad-input"); }
+    if(s.h<0){ errs.push("Human height cannot be negative."); $("f-h").classList.add("bad-input"); }
+    else if(s.H>0 && s.h>=s.H){
+      errs.push("The person ("+m(s.h)+") is at or above the sensor ("+m(s.H)+"), so their head is never inside the cone and usable coverage is zero.");
+      $("f-h").classList.add("bad-input"); $("f-H").classList.add("bad-input");
+    }
+    return errs;
+  }
+
+  function render(){
+    var s=readState(), errs=validate(s), a=$("alert");
+    if(errs.length){ a.classList.remove("hide"); a.innerHTML=errs.join("<br>"); } else a.classList.add("hide");
+
+    var ok = s.fovW>0&&s.fovW<180&&s.fovL>0&&s.fovL<180&&s.H>0&&s.h>=0;
+    if(!ok){
+      ["r-Wf","r-Lf","r-Wd","r-Ld","r-blind","r-Af","r-Ad","r-ratio","r-clear","r-diag","r-slant"]
+        .forEach(function(id){ $(id).textContent="–"; });
+      ["r-Wf-x","r-Lf-x","r-Wd-x","r-Ld-x","r-blind-x"].forEach(function(id){ $(id).textContent=""; });
+      ["svgW","svgL","svgP"].forEach(function(id){ $(id).textContent=""; });
+      return;
+    }
+
+    var o=compute(s);
+    $("r-Wf").innerHTML=fmt(o.Wf,2)+' <small>m</small>';
+    $("r-Lf").innerHTML=fmt(o.Lf,2)+' <small>m</small>';
+    $("r-Wd").innerHTML=fmt(o.Wd,2)+' <small>m</small>';
+    $("r-Ld").innerHTML=fmt(o.Ld,2)+' <small>m</small>';
+    $("r-Wf-x").textContent="2 × "+fmt(s.H,2)+" × tan("+fmt(s.fovW,1)+"°/2)";
+    $("r-Lf-x").textContent="2 × "+fmt(s.H,2)+" × tan("+fmt(s.fovL,1)+"°/2)";
+    $("r-Wd-x").textContent="2 × "+fmt(Math.max(o.clear,0),2)+" × tan("+fmt(s.fovW,1)+"°/2)";
+    $("r-Ld-x").textContent="2 × "+fmt(Math.max(o.clear,0),2)+" × tan("+fmt(s.fovL,1)+"°/2)";
+    $("r-blind").innerHTML=fmt(o.marginW,2)+' <small>m width</small> &nbsp;/&nbsp; '+fmt(o.marginL,2)+' <small>m length</small>';
+    $("r-blind-x").textContent="each side = h × tan(FOV/2)";
+    $("r-Af").textContent=fmt(o.Af,2)+" m²";
+    $("r-Ad").textContent=fmt(o.Ad,2)+" m²";
+    $("r-ratio").textContent=fmt(o.ratio*100,1)+" %";
+    $("r-clear").textContent=fmt(o.clear,2)+" m";
+    $("r-diag").textContent=fmt(o.diag,2)+" m";
+    $("r-slant").textContent=fmt(o.slant,2)+" m";
+
+    renderSide("svgW",s,o,"W");
+    renderSide("svgL",s,o,"L");
+    renderPlan("svgP",s,o);
+  }
+
+  /* ------------------------------------------------------------- url hash */
+  function writeHash(){
+    var s=readState();
+    history.replaceState(null,"","#a="+s.fovW+"&b="+s.fovL+"&H="+s.H+"&h="+s.h);
+  }
+  function readHash(){
+    var q=location.hash.replace(/^#/,""); if(!q) return false;
+    var p={}; q.split("&").forEach(function(kv){ var x=kv.split("="); p[x[0]]=parseFloat(x[1]); });
+    var map={a:"fovW",b:"fovL",H:"H",h:"h"}, any=false;
+    for(var k in map) if(isFinite(p[k])){ $(map[k]).value=p[k]; any=true; }
+    return any;
+  }
+  function syncRanges(){ FIELDS.forEach(function(k){ var r=$(k+"_r"); if(r) r.value=$(k).value; }); }
+
+  /* -------------------------------------------------------------- events */
+  FIELDS.forEach(function(k){
+    var num=$(k), rng=$(k+"_r");
+    num.addEventListener("input",function(){ if(rng) rng.value=num.value; render(); });
+    num.addEventListener("change",function(){ clampInto(k); if(rng) rng.value=num.value; render(); writeHash(); });
+    if(rng){
+      rng.addEventListener("input",function(){ num.value=rng.value; render(); });
+      rng.addEventListener("change",writeHash);
+    }
+  });
+
+  var PRESETS=[
+    {n:"45° × 45°",a:45,b:45},
+    {n:"65° × 65°",a:65,b:65},
+    {n:"60° × 45°",a:60,b:45},
+    {n:"90° × 70°",a:90,b:70},
+    {n:"Office 2.8 m",H:2.80},
+    {n:"Warehouse 6.0 m",H:6.00},
+    {n:"Adult 1.75 m",h:1.75},
+    {n:"Child 1.20 m",h:1.20}
+  ];
+  (function(){
+    var box=$("presets");
+    PRESETS.forEach(function(p){
+      var b=document.createElement("button");
+      b.className="chip"; b.type="button"; b.textContent=p.n;
+      b.addEventListener("click",function(){
+        if(p.a!==undefined){ $("fovW").value=p.a; }
+        if(p.b!==undefined){ $("fovL").value=p.b; }
+        if(p.H!==undefined){ $("H").value=p.H; }
+        if(p.h!==undefined){ $("h").value=p.h; }
+        syncRanges(); render(); writeHash();
+      });
+      box.appendChild(b);
+    });
+  })();
+
+  function copy(txt,msg){
+    if(navigator.clipboard&&navigator.clipboard.writeText)
+      navigator.clipboard.writeText(txt).then(function(){ toast(msg); },function(){ fallback(txt,msg); });
+    else fallback(txt,msg);
+  }
+  function fallback(txt,msg){
+    var ta=document.createElement("textarea");
+    ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); toast(msg); }catch(e){ toast("Copy failed"); }
+    document.body.removeChild(ta);
+  }
+
+  $("copyBtn").addEventListener("click",function(){
+    var s=readState(), o=compute(s);
+    copy([
+      "TOF CEILING COVERAGE",
+      "",
+      "Inputs",
+      "  FOV width  (alpha)      : "+fmt(s.fovW,1)+" deg",
+      "  FOV length (beta)       : "+fmt(s.fovL,1)+" deg",
+      "  Sensor / ceiling height : "+fmt(s.H,2)+" m",
+      "  Target human height     : "+fmt(s.h,2)+" m",
+      "",
+      "Full floor coverage",
+      "  Width x Length : "+fmt(o.Wf,2)+" m x "+fmt(o.Lf,2)+" m",
+      "  Area           : "+fmt(o.Af,2)+" m2",
+      "",
+      "Usable coverage for a "+fmt(s.h,2)+" m person",
+      "  Width x Length : "+fmt(o.Wd,2)+" m x "+fmt(o.Ld,2)+" m",
+      "  Area           : "+fmt(o.Ad,2)+" m2  ("+fmt(o.ratio*100,1)+"% of full)",
+      "  Diagonal       : "+fmt(o.diag,2)+" m",
+      "",
+      "Blind margin per side",
+      "  Width direction  : "+fmt(o.marginW,2)+" m",
+      "  Length direction : "+fmt(o.marginL,2)+" m"
+    ].join("\n"),"Summary copied");
+  });
+  $("linkBtn").addEventListener("click",function(){ writeHash(); copy(location.href,"Link copied"); });
+  $("printBtn").addEventListener("click",function(){ window.print(); });
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-dl]"),function(btn){
+    btn.addEventListener("click",function(){
+      var src=$(btn.getAttribute("data-dl")).querySelector("svg");
+      if(!src) return;
+      var cs=getComputedStyle(document.body);
+      var vars=["--ink","--ink-2","--ink-3","--line","--line-strong","--beam","--ok","--bad","--sensor","--panel"];
+      var html=new XMLSerializer().serializeToString(src.cloneNode(true));
+      vars.forEach(function(v){ html=html.split("var("+v+")").join(cs.getPropertyValue(v).trim()||"#000"); });
+      html=html.replace("<svg",'<svg xmlns="http://www.w3.org/2000/svg"');
+      var a=document.createElement("a");
+      a.href=URL.createObjectURL(new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n'+html],{type:"image/svg+xml"}));
+      a.download="tof-"+btn.getAttribute("data-dl").replace("svg","").toLowerCase()+"-coverage.svg";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(a.href); },2000);
+      toast("SVG downloaded");
+    });
+  });
+
+  $("themeBtn").addEventListener("click",function(){
+    var cur=document.documentElement.getAttribute("data-theme");
+    var dark=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-theme", cur ? (cur==="dark"?"light":"dark") : (dark?"light":"dark"));
+    render();
+  });
+  window.addEventListener("hashchange",function(){ if(readHash()){ syncRanges(); render(); } });
+
+  readHash(); syncRanges(); render();
+})();
+</script>
+</body>
+</html>
