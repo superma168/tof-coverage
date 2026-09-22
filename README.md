@@ -46,8 +46,11 @@ prints cleanly. Results copy to the clipboard as plain text, and the current con
 encoded in the URL so a set of parameters can be shared as a link:
 
 ```
-index.html#a=60&b=45&H=2.8&h=1.75
+index.html#a=108&b=78&H=2.8&h=1.75
 ```
+
+The page opens with a **108° × 78°** lens at H = 2.80 m detecting a 1.75 m person; preset chips
+switch quickly between other lens angles, mounting heights and target heights.
 
 ## Formulas
 
@@ -87,19 +90,23 @@ Note that the blind margin depends only on the person's height and the FOV — *
 height. Raising the sensor grows the floor rectangle but the lost ring around it keeps the same
 width.
 
-### Worked example
+### Worked example (the page defaults)
 
-α = 60°, β = 45°, H = 2.80 m, h = 1.75 m
+α = 108°, β = 78°, H = 2.80 m, h = 1.75 m
 
 | Quantity | Value |
 |---|---|
-| `W_floor` | 3.23 m |
-| `L_floor` | 2.32 m |
-| `A_floor` | 7.50 m² |
-| `W_usable` | 1.21 m |
-| `L_usable` | 0.87 m |
-| `A_usable` | 1.05 m² (14.1 % of full) |
-| Blind margin | 1.01 m (width) / 0.72 m (length) |
+| `W_floor` | 7.71 m |
+| `L_floor` | 4.53 m |
+| `A_floor` | 34.95 m² |
+| `W_usable` | 2.89 m |
+| `L_usable` | 1.70 m |
+| `A_usable` | 4.92 m² (14.1 % of full) |
+| Blind margin | 2.41 m (width) / 1.42 m (length) |
+
+The area ratio is `((H − h) / H)²` and so is independent of the FOV — a wider lens buys
+proportionally more floor *and* proportionally more blind ring. What the wide lens changes is the
+absolute loss: at 108° the width margin alone is 2.41 m per side.
 
 ## Assumptions and caveats
 

@@ -158,15 +158,15 @@
           <div class="field" id="f-fovW">
             <label class="lab" for="fovW">Sensor FOV — width direction &nbsp;<span class="sym">α</span></label>
             <p class="desc">Full lens field-of-view angle across the room width.</p>
-            <div class="inp-shell"><input type="number" id="fovW" min="1" max="179" step="0.1" value="60"><span class="unit">deg</span></div>
-            <input type="range" id="fovW_r" min="1" max="179" step="0.5" value="60">
+            <div class="inp-shell"><input type="number" id="fovW" min="1" max="179" step="0.1" value="108"><span class="unit">deg</span></div>
+            <input type="range" id="fovW_r" min="1" max="179" step="0.5" value="108">
           </div>
 
           <div class="field" id="f-fovL">
             <label class="lab" for="fovL">Sensor FOV — length direction &nbsp;<span class="sym">β</span></label>
             <p class="desc">Full lens field-of-view angle along the room length.</p>
-            <div class="inp-shell"><input type="number" id="fovL" min="1" max="179" step="0.1" value="45"><span class="unit">deg</span></div>
-            <input type="range" id="fovL_r" min="1" max="179" step="0.5" value="45">
+            <div class="inp-shell"><input type="number" id="fovL" min="1" max="179" step="0.1" value="78"><span class="unit">deg</span></div>
+            <input type="range" id="fovL_r" min="1" max="179" step="0.5" value="78">
           </div>
 
           <div class="field" id="f-H">
@@ -733,6 +733,7 @@ margin_length = (L_floor − L_usable) / 2 = h · tan(β / 2)</div>
   });
 
   var PRESETS=[
+    {n:"108° × 78°",a:108,b:78},
     {n:"45° × 45°",a:45,b:45},
     {n:"65° × 65°",a:65,b:65},
     {n:"60° × 45°",a:60,b:45},
